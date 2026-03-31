@@ -221,8 +221,11 @@
     .stat-value{font-size:18px;}
     #citasTable{display:none!important;}
     #citasCards{display:block;}
-    .chats-layout{grid-template-columns:1fr;height:auto;}
-    .chats-sidebar{height:300px;}
+    /* Mobile chat layout: stack vertically */
+    .chats-layout{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:calc(100vh - 130px);}
+    .chats-sidebar{display:flex!important;height:220px;border-right:none;border-bottom:1px solid var(--border);}
+    .chat-main{height:auto;}
+    .chat-messages{max-height:300px;}
     .income-grid{grid-template-columns:1fr 1fr;}
     .pro-grid{grid-template-columns:1fr;}
     .daily-grid{grid-template-columns:repeat(2,1fr);}

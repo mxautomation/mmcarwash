@@ -522,6 +522,12 @@
         <div class="form-group"><label class="form-label">Supabase URL</label><input class="form-input" id="supabaseUrl" placeholder="https://xxx.supabase.co"></div>
         <div class="form-group"><label class="form-label">Supabase Publishable Key</label><input class="form-input" id="supabaseKey" placeholder="sb_publishable_..."></div>
         <button class="btn-primary" style="background:var(--accent2)" onclick="saveSupabaseConfig()">Guardar Supabase</button>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <div class="config-title" style="font-size:14px;margin-bottom:6px">WhatsApp (para responder desde el panel)</div>
+          <div class="form-group"><label class="form-label">Phone Number ID</label><input class="form-input" id="waPhoneId" placeholder="1091808890672633"></div>
+          <div class="form-group"><label class="form-label">Access Token</label><input class="form-input" id="waToken" placeholder="EAAVTm289..."></div>
+          <button class="btn-primary" style="background:var(--green)" onclick="saveWaConfig()">Guardar WhatsApp</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1090,7 +1096,26 @@ async function fetchMensajes(){
     });
     if(!res.ok) return;
     allMensajes = await res.json();
-    renderChats();
+    // Always update sidebar list
+    const grupos = agruparPorCliente(allMensajes);
+    document.getElementById('chatsBadge').textContent = grupos.length;
+    renderChatList(grupos);
+    // Only update messages area, NOT the input field
+    if(chatActivo){
+      const grupo = grupos.find(g=>g.telefono===chatActivo);
+      if(grupo){
+        const msgContainer = document.getElementById('chatMessages');
+        if(msgContainer){
+          const wasAtBottom = msgContainer.scrollHeight - msgContainer.scrollTop <= msgContainer.clientHeight + 50;
+          msgContainer.innerHTML = grupo.mensajes.map(m=>`
+            <div>
+              <div class="msg msg-${m.tipo}">${m.mensaje||''}</div>
+              <div class="msg-time" style="text-align:${m.tipo==='salida'?'right':'left'}">${new Date(m.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',timeZone:'America/Merida'})}</div>
+            </div>`).join('');
+          if(wasAtBottom) msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+      }
+    }
   } catch(e){ console.log('Supabase error:', e); }
 }
 
@@ -1116,7 +1141,6 @@ function renderChats(){
   const grupos = agruparPorCliente(allMensajes);
   document.getElementById('chatsBadge').textContent = grupos.length;
   renderChatList(grupos);
-  if(chatActivo) abrirChat(chatActivo);
 }
 
 function renderChatList(grupos){
@@ -1151,12 +1175,22 @@ function abrirChat(telefono){
   const grupo = grupos.find(g=>g.telefono===telefono);
   if(!grupo) return;
   const main = document.getElementById('chatMain');
+  const modoActual = clienteModos[telefono] || 'bot';
+  const esManual = modoActual === 'manual';
   main.innerHTML = `
-    <div class="chat-header">
-      <div class="chat-avatar" style="width:36px;height:36px;font-size:14px">${(grupo.nombre||'?')[0].toUpperCase()}</div>
-      <div>
-        <div class="chat-header-name">${grupo.nombre}</div>
-        <div class="chat-header-phone">${grupo.telefono}</div>
+    <div class="chat-header" style="justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="chat-avatar" style="width:36px;height:36px;font-size:14px">${(grupo.nombre||'?')[0].toUpperCase()}</div>
+        <div>
+          <div class="chat-header-name">${grupo.nombre}</div>
+          <div class="chat-header-phone">${grupo.telefono}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:12px;color:var(--text3)">${esManual?'🔴 Tú':'🤖 Bot'}</span>
+        <div onclick="toggleModo('${telefono}')" style="width:44px;height:24px;border-radius:12px;background:${esManual?'var(--orange)':'var(--accent)'};cursor:pointer;position:relative;transition:background .3s;">
+          <div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;top:3px;${esManual?'right:3px':'left:3px'};transition:all .3s;"></div>
+        </div>
       </div>
     </div>
     <div class="chat-messages" id="chatMessages">
@@ -1165,10 +1199,78 @@ function abrirChat(telefono){
           <div class="msg msg-${m.tipo}">${m.mensaje||''}</div>
           <div class="msg-time" style="text-align:${m.tipo==='salida'?'right':'left'}">${new Date(m.created_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',timeZone:'America/Merida'})}</div>
         </div>`).join('')}
-    </div>`;
-  // scroll to bottom
+    </div>
+    ${esManual?`
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface);">
+      <input id="replyInput" type="text" placeholder="Escribe tu respuesta..." style="flex:1;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;" onkeypress="if(event.key==='Enter')enviarMensaje('${telefono}')">
+      <button onclick="enviarMensaje('${telefono}')" style="padding:10px 18px;background:var(--accent);color:white;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Enviar</button>
+    </div>`:'<div style="padding:10px 16px;border-top:1px solid var(--border);text-align:center;font-size:12px;color:var(--text3);">🤖 El bot está respondiendo automáticamente</div>'}`;
   setTimeout(()=>{const el=document.getElementById('chatMessages');if(el)el.scrollTop=el.scrollHeight;},100);
   renderChatList(grupos);
+}
+
+let clienteModos = {};
+
+async function toggleModo(telefono){
+  const actual = clienteModos[telefono] || 'bot';
+  const nuevo = actual === 'bot' ? 'manual' : 'bot';
+  const url = localStorage.getItem('supabaseUrl');
+  const key = localStorage.getItem('supabaseKey');
+  if(!url||!key) return;
+  // Check if client exists in table
+  try{
+    const check = await fetch(`${url}/rest/v1/clientes?telefono=eq.${telefono}`, {
+      headers:{'apikey':key,'Authorization':`Bearer ${key}`}
+    });
+    const data = await check.json();
+    if(data.length===0){
+      // Insert new client
+      await fetch(`${url}/rest/v1/clientes`, {
+        method:'POST',
+        headers:{'apikey':key,'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+        body:JSON.stringify({telefono, nombre: agruparPorCliente(allMensajes).find(g=>g.telefono===telefono)?.nombre||telefono, modo:nuevo})
+      });
+    } else {
+      // Update existing
+      await fetch(`${url}/rest/v1/clientes?telefono=eq.${telefono}`, {
+        method:'PATCH',
+        headers:{'apikey':key,'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+        body:JSON.stringify({modo:nuevo})
+      });
+    }
+    clienteModos[telefono] = nuevo;
+    abrirChat(telefono);
+  } catch(e){ console.log('Error toggle modo:', e); }
+}
+
+async function enviarMensaje(telefono){
+  const input = document.getElementById('replyInput');
+  const msg = input?.value.trim();
+  if(!msg) return;
+  const url = localStorage.getItem('supabaseUrl');
+  const key = localStorage.getItem('supabaseKey');
+  if(!url||!key) return;
+  // Save to Supabase
+  try{
+    const grupo = agruparPorCliente(allMensajes).find(g=>g.telefono===telefono);
+    await fetch(`${url}/rest/v1/mensajes`, {
+      method:'POST',
+      headers:{'apikey':key,'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+      body:JSON.stringify({telefono, nombre:grupo?.nombre||telefono, mensaje:msg, tipo:'salida', leido:true})
+    });
+    input.value = '';
+    // Send via WhatsApp API
+    const phoneId = localStorage.getItem('waPhoneId') || '';
+    const waToken = localStorage.getItem('waToken') || '';
+    if(phoneId && waToken){
+      await fetch(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
+        method:'POST',
+        headers:{'Authorization':`Bearer ${waToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({messaging_product:'whatsapp',to:telefono,type:'text',text:{body:msg}})
+      });
+    }
+    fetchMensajes();
+  } catch(e){ console.log('Error enviar:', e); }
 }
 
 function initChats(){
@@ -1184,6 +1286,12 @@ function showTab(name){
   document.getElementById('panel-'+name).classList.add('active');
   if(name==='alertas'){alertas.forEach(a=>a.unread=false);save('alertas',alertas);updateAlertCount();renderAlertas();}
   if(name==='chats'){initChats();}
+}
+
+function saveWaConfig(){
+  localStorage.setItem('waPhoneId', document.getElementById('waPhoneId').value.trim());
+  localStorage.setItem('waToken', document.getElementById('waToken').value.trim());
+  alert('✅ WhatsApp guardado. Ya puedes responder desde los chats.');
 }
 
 function saveSupabaseConfig(){
@@ -1205,6 +1313,8 @@ window.onload=()=>{
   document.getElementById('gastoFecha').value=today();
   const sUrl=localStorage.getItem('supabaseUrl');if(sUrl)document.getElementById('supabaseUrl').value=sUrl;
   const sKey=localStorage.getItem('supabaseKey');if(sKey)document.getElementById('supabaseKey').value=sKey;
+  const waP=localStorage.getItem('waPhoneId');if(waP)document.getElementById('waPhoneId').value=waP;
+  const waT=localStorage.getItem('waToken');if(waT)document.getElementById('waToken').value=waT;
   syncData();
 };
 </script>

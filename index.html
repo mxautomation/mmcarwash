@@ -199,6 +199,38 @@
   .action-btn.orange{border-color:rgba(249,115,22,.3);color:var(--orange);background:rgba(249,115,22,.08);}
 
   /* PDF export */
+  /* MOBILE CITA CARDS */
+  .cita-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;animation:fadeIn .3s ease;}
+  .cita-card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2);}
+  .cita-card-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+  .cita-card-phone{font-size:11px;color:var(--text3);margin-top:1px;}
+  .cita-card-body{padding:12px 16px;}
+  .cita-card-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+  .cita-card-row:last-child{border-bottom:none;}
+  .cita-card-label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+  .cita-card-value{font-size:13px;font-weight:500;}
+  .cita-card-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
+  .cita-card-footer button{flex:1;}
+
+  @media(max-width:768px){
+    .content{padding:14px 12px;}
+    header{padding:14px 16px;}
+    .tabs{padding:12px 12px 0;gap:2px;}
+    .tab{padding:8px 10px;font-size:11px;}
+    .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .stat-value{font-size:18px;}
+    #citasTable{display:none!important;}
+    #citasCards{display:block;}
+    .chats-layout{grid-template-columns:1fr;height:auto;}
+    .chats-sidebar{height:300px;}
+    .income-grid{grid-template-columns:1fr 1fr;}
+    .pro-grid{grid-template-columns:1fr;}
+    .daily-grid{grid-template-columns:repeat(2,1fr);}
+    .section-header{flex-direction:column;align-items:flex-start;gap:10px;}
+  }
+  @media(min-width:769px){
+    #citasCards{display:none;}
+  }
   @media print {
     header,div.tabs,.sync-btn,.action-btn,.modal-overlay{display:none!important;}
     body{background:white;color:black;}
@@ -358,6 +390,7 @@
         <thead><tr><th>Cliente</th><th>Vehículo</th><th>Colonia</th><th>Paquete</th><th>Fecha</th><th>Precio</th><th>Propina 🤑</th><th>Origen</th><th>Estado</th><th>Acciones</th></tr></thead>
         <tbody id="citasBody"></tbody>
       </table>
+      <div id="citasCards" style="padding:12px"></div>
     </div>
   </div>
 
@@ -704,19 +737,56 @@ function renderCitas(){
     const isDone=status==='done';
     const tr=document.createElement('tr');
     tr.innerHTML=`
-      <td><div style="font-weight:500">${c.nombre||'—'}</div>${c.telefono?`<div style="font-size:10px;color:var(--text3)">${c.telefono}</div>`:''}</td>
-      <td>${c.vehiculo||'—'}</td><td>${c.colonia||'—'}</td>
-      <td><span class="pkg ${getPkgClass(c.paquete)}">${(c.paquete||'—').toUpperCase()}</span></td>
-      <td>${c.fechaCita||'—'}</td>
-      <td style="font-weight:600;color:var(--green)">${precio?'$'+precio:'—'}</td>
-      <td>${isDone?`<input class="tip-input" type="number" min="0" placeholder="0" value="${propina||''}" onchange="setTip('${c.id}',this.value)">`:
+      <td data-label="Cliente"><div style="font-weight:500">${c.nombre||'—'}</div>${c.telefono?`<div style="font-size:10px;color:var(--text3)">${c.telefono}</div>`:''}</td>
+      <td data-label="Vehículo">${c.vehiculo||'—'}</td>
+      <td data-label="Colonia">${c.colonia||'—'}</td>
+      <td data-label="Paquete"><span class="pkg ${getPkgClass(c.paquete)}">${(c.paquete||'—').toUpperCase()}</span></td>
+      <td data-label="Fecha">${c.fechaCita||'—'}</td>
+      <td data-label="Precio" style="font-weight:600;color:var(--green)">${precio?'$'+precio:'—'}</td>
+      <td data-label="Propina">${isDone?`<input class="tip-input" type="number" min="0" placeholder="0" value="${propina||''}" onchange="setTip('${c.id}',this.value)">`:
         `<span style="color:var(--text3);font-size:11px">${status==='cancelled'?'—':'Al atender'}</span>`}</td>
-      <td><span style="font-size:10px;padding:3px 7px;border-radius:4px;background:${c.origen==='Manual'?'rgba(124,58,237,.2)':'rgba(79,141,255,.15)'};color:${c.origen==='Manual'?'#a78bfa':'#60a5fa'}">${c.origen==='Manual'?'📞 Manual':'🤖 Bot'}</span></td>
-      <td><div class="status status-${status}"><div class="status-dot"></div>${labels[status]}</div></td>
-      <td>${status==='pending'
+      <td data-label="Origen"><span style="font-size:10px;padding:3px 7px;border-radius:4px;background:${c.origen==='Manual'?'rgba(124,58,237,.2)':'rgba(79,141,255,.15)'};color:${c.origen==='Manual'?'#a78bfa':'#60a5fa'}">${c.origen==='Manual'?'📞 Manual':'🤖 Bot'}</span></td>
+      <td data-label="Estado"><div class="status status-${status}"><div class="status-dot"></div>${labels[status]}</div></td>
+      <td data-label="Acciones">${status==='pending'
         ?`<button class="btn-sm btn-confirm" onclick="setStatus('${c.id}','done')">✓</button><button class="btn-sm btn-cancel" onclick="setStatus('${c.id}','cancelled')">✕</button>`
         :`<button class="btn-sm" onclick="setStatus('${c.id}','pending')" style="color:var(--text3)">Reabrir</button>`}</td>`;
     body.appendChild(tr);
+  });
+
+  // Render mobile cards
+  const cardsContainer = document.getElementById('citasCards');
+  cardsContainer.innerHTML = '';
+  [...allCitas].reverse().forEach(c => {
+    const precio = getPrecio(c.paquete, c.vehiculo);
+    const status = citaStatus[c.id] || 'pending';
+    const labels = {pending:'⏳ Pendiente', done:'✅ Atendida', cancelled:'❌ Cancelada'};
+    const propina = propinas[c.id] || 0;
+    const isDone = status === 'done';
+    const card = document.createElement('div');
+    card.className = 'cita-card';
+    card.innerHTML = `
+      <div class="cita-card-header">
+        <div>
+          <div class="cita-card-name">👤 ${c.nombre||'—'}</div>
+          ${c.telefono?`<div class="cita-card-phone">📞 ${c.telefono}</div>`:''}
+        </div>
+        <span style="font-size:10px;padding:3px 8px;border-radius:4px;background:${c.origen==='Manual'?'rgba(124,58,237,.2)':'rgba(79,141,255,.15)'};color:${c.origen==='Manual'?'#a78bfa':'#60a5fa'}">${c.origen==='Manual'?'📞 Manual':'🤖 Bot'}</span>
+      </div>
+      <div class="cita-card-body">
+        <div class="cita-card-row"><span class="cita-card-label">🚗 Vehículo</span><span class="cita-card-value">${c.vehiculo||'—'}</span></div>
+        <div class="cita-card-row"><span class="cita-card-label">📍 Colonia</span><span class="cita-card-value">${c.colonia||'—'}</span></div>
+        <div class="cita-card-row"><span class="cita-card-label">📦 Paquete</span><span class="cita-card-value"><span class="pkg ${getPkgClass(c.paquete)}">${(c.paquete||'—').toUpperCase()}</span></span></div>
+        <div class="cita-card-row"><span class="cita-card-label">📅 Fecha</span><span class="cita-card-value">${c.fechaCita||'—'}</span></div>
+        <div class="cita-card-row"><span class="cita-card-label">💵 Precio</span><span class="cita-card-value" style="color:var(--green);font-weight:700">${precio?'$'+precio:'—'}</span></div>
+        <div class="cita-card-row"><span class="cita-card-label">🤑 Propina</span><span class="cita-card-value">${isDone?`<input class="tip-input" type="number" min="0" placeholder="0" value="${propina||''}" onchange="setTip('${c.id}',this.value)" style="width:70px">`:'-'}</span></div>
+        <div class="cita-card-row"><span class="cita-card-label">✅ Estado</span><span class="cita-card-value"><div class="status status-${status}"><div class="status-dot"></div>${labels[status]}</div></span></div>
+      </div>
+      <div class="cita-card-footer">
+        ${status==='pending'
+          ?`<button class="btn-sm btn-confirm" onclick="setStatus('${c.id}','done')" style="flex:1">✓ Atendida</button><button class="btn-sm btn-cancel" onclick="setStatus('${c.id}','cancelled')" style="flex:1">✕ Cancelar</button>`
+          :`<button class="btn-sm" onclick="setStatus('${c.id}','pending')" style="color:var(--text3);flex:1">↩ Reabrir</button>`}
+      </div>`;
+    cardsContainer.appendChild(card);
   });
 }
 
